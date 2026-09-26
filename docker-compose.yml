@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
     ports:
-      - "15432:5432"
+      - "127.0.0.1:15432:5432"
 
     volumes:
       - payguard-postgres-data:/var/lib/postgresql/data
@@ -35,7 +35,7 @@ services:
       FAILURE_SIMULATION_ENABLED: "true"
 
     ports:
-      - "8081:8081"
+      - "127.0.0.1:8081:8081"
 
     depends_on:
       postgres:
@@ -57,7 +57,7 @@ services:
       - payguard-prometheus-data:/prometheus
 
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
 
     depends_on:
       - payment-service
@@ -73,7 +73,7 @@ services:
       - "-config.file=/etc/loki/local-config.yaml"
 
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3100:3100"
 
     volumes:
       - payguard-loki-data:/loki
@@ -107,10 +107,10 @@ services:
 
     environment:
       GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in your local .env}
 
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
 
     volumes:
       - payguard-grafana-data:/var/lib/grafana

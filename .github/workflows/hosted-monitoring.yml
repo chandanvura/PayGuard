@@ -30,7 +30,8 @@ jobs:
         run: docker build -t payguard-payment-service:local ./payment-service
       - name: Start observability stack
         run: |
-          printf 'POSTGRES_DB=payguard\nPOSTGRES_USER=payguard\nPOSTGRES_PASSWORD=runner_only_password\n' > .env
+          printf 'POSTGRES_DB=payguard\nPOSTGRES_USER=payguard\nPOSTGRES_PASSWORD=runner_only_password\nGRAFANA_ADMIN_PASSWORD=%s\n' "$(openssl rand -hex 24)" > .env
+          chmod 600 .env
           docker compose -f docker-compose.yml -f docker-compose.hosted.yml up -d postgres payment-service prometheus loki grafana
       - name: Exercise live payment recovery
         env:
