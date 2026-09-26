@@ -9,11 +9,6 @@ on:
 permissions:
   contents: read
 
-env:
-  CI_POSTGRES_DB: payguard
-  CI_POSTGRES_USER: payguard_ci
-  CI_POSTGRES_PASSWORD: payguard_ci_test_only
-
 jobs:
   test:
     name: Java Tests
@@ -23,9 +18,9 @@ jobs:
       postgres:
         image: postgres:17
         env:
-          POSTGRES_DB: ${{ env.CI_POSTGRES_DB }}
-          POSTGRES_USER: ${{ env.CI_POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ env.CI_POSTGRES_PASSWORD }}
+          POSTGRES_DB: payguard
+          POSTGRES_USER: payguard_ci
+          POSTGRES_PASSWORD: payguard_ci_test_only
         ports:
           - 5432:5432
         options: >-
@@ -39,10 +34,10 @@ jobs:
         working-directory: payment-service
 
     env:
-      DB_URL: jdbc:postgresql://localhost:5432/${{ env.CI_POSTGRES_DB }}
-      DB_USERNAME: ${{ env.CI_POSTGRES_USER }}
-      DB_PASSWORD: ${{ env.CI_POSTGRES_PASSWORD }}
-      FAILURE_SIMULATION_ENABLED: false
+      DB_URL: jdbc:postgresql://localhost:5432/payguard
+      DB_USERNAME: payguard_ci
+      DB_PASSWORD: payguard_ci_test_only
+      FAILURE_SIMULATION_ENABLED: "false"
 
     steps:
       - name: Checkout repository
@@ -96,6 +91,3 @@ jobs:
           kubectl apply --dry-run=client -f kubernetes/postgres/service.yaml
           kubectl apply --dry-run=client -f kubernetes/payment-service/deployment.yaml
           kubectl apply --dry-run=client -f kubernetes/payment-service/service.yaml
-
-
-
