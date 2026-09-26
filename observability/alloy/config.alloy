@@ -4,6 +4,12 @@ discovery.docker "payguard" {
 
 discovery.relabel "payguard" {
   targets = discovery.docker.payguard.targets
+  // Collect only PayGuard Docker Compose containers.
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    regex         = "payguard"
+    action        = "keep"
+  }
 
   rule {
     source_labels = ["__meta_docker_container_name"]
@@ -49,3 +55,4 @@ loki.write "payguard" {
     url = "http://loki:3100/loki/api/v1/push"
   }
 }
+
