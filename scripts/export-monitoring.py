@@ -4,6 +4,7 @@ import html
 import json
 import os
 import time
+import uuid
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -16,7 +17,7 @@ QUERIES = {
     'Error ratio (5m)': 'payguard:sli_error:ratio5m',
     'Error budget burn rate': 'payguard:slo_availability:burn_rate5m',
     'Requests within 250 ms': 'payguard:sli_latency_250ms:ratio5m',
-    'Payments created': 'payguard_payment_created_total',
+    'Payments created': 'payguard_payment_total',
 }
 
 def get(path, params=None):
@@ -37,6 +38,20 @@ for attempt in range(40):
     time.sleep(3)
 else:
     raise RuntimeError('Prometheus payment-service target did not become UP')
+
+
+# Generate simulated payments after the Prometheus target is UP so rate windows
+# contain real observations across multiple scrapes. No external provider is used.
+for _ in range(5):
+    payload = json.dumps({'customerId': 'CI-MONITORING', 'amount': 149900, 'currency': 'INR'}).encode()
+    req = urllib.request.Request('http://localhost:8081/api/v1/payments', data=payload,
+        headers={'Content-Type': 'application/json', 'Idempotency-Key': 'CI-MONITOR-' + uuid.uuid4().hex})
+    with urllib.request.urlopen(req, timeout=10) as response:
+        payment = json.load(response)
+    if payment['status'] != 'SUCCESS':
+        raise RuntimeError('Monitoring payment did not succeed')
+    time.sleep(6)
+
 
 # A five-minute rate requires multiple scrapes; wait until the availability series exists.
 for attempt in range(30):
