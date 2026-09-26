@@ -5,7 +5,7 @@ if (-not (Test-Path .env)) { throw 'Missing .env. Create it locally with POSTGRE
 if (-not (Select-String -Path .env -Pattern '^GRAFANA_ADMIN_PASSWORD=' -Quiet)) {
     $random = [byte[]]::new(32)
     [Security.Cryptography.RandomNumberGenerator]::Fill($random)
-    $password = [Convert]::ToHexString($random)
+    $password = [BitConverter]::ToString($random).Replace('-', '')
     Add-Content -Path .env -Value "GRAFANA_ADMIN_PASSWORD=$password"
     Write-Host 'Generated a local Grafana admin password in .env.'
 }
