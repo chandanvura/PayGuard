@@ -142,11 +142,11 @@ From the repository root in PowerShell:
 .\scripts\stop.ps1
 ```
 
-Use `start.ps1 -Kubernetes` to also start Minikube. `stop.ps1 -StopMinikube` stops Minikube too. Stopping retains persistent volumes; neither command deletes database data. `start.ps1` requires a local `.env` containing `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`. Keep that file out of Git. The full local demo expects both Docker Compose and the PayGuard Minikube deployment to be running.
+Use `start.ps1 -Kubernetes` to also start Minikube. `stop.ps1 -StopMinikube` stops Minikube too. Stopping retains persistent volumes; neither command deletes database data. `start.ps1` requires a local `.env` containing `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`. Keep that file out of Git. The local demo checks Compose services by default. Use `run-demo.ps1 -Kubernetes` to also verify the Minikube payment-service rollout. On a fresh machine, `start.ps1` builds the application image if it is missing.
 
 ## Portfolio site and hosted demonstration
 
-The static [PayGuard portfolio site](https://chandanvura.github.io/PayGuard/) is deployed by `.github/workflows/pages.yml` from `website/`. Repository settings must have **Pages → Build and deployment → Source: GitHub Actions**.
+The static [PayGuard portfolio site](https://chandanvura.github.io/PayGuard/) has separate [architecture](https://chandanvura.github.io/PayGuard/architecture.html), [learning](https://chandanvura.github.io/PayGuard/learning.html), [monitoring](https://chandanvura.github.io/PayGuard/monitoring.html), and [demo](https://chandanvura.github.io/PayGuard/demo.html) pages. It is deployed by `.github/workflows/pages.yml` from `website/`. Repository settings must have **Pages → Build and deployment → Source: GitHub Actions**.
 
 The [Reliability demo workflow](https://github.com/chandanvura/PayGuard/actions/workflows/reliability-demo.yml) can be launched with **Run workflow**. It starts a temporary PostgreSQL service and Spring Boot process on a GitHub runner, verifies the timeout, idempotent retry, automatic reconciliation, health, and metrics, then publishes a run summary and 30-day evidence artifact. No laptop or paid host is involved. GitHub-hosted CI is a short-lived demonstration, not a persistent live payment API. The fake provider never charges real money.
 
@@ -542,7 +542,7 @@ Detailed documentation is available in:
 
 ### Defined but Pending Runtime Validation
 
-- New GitHub Actions reliability demo and Pages deployment, pending their first successful run after this push
+- GitHub Actions reliability demo and Pages deployment, successfully executed on commit `105a1fa`
 - Jenkins execution on an actual Jenkins agent
 
 ## Purpose
