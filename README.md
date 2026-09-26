@@ -247,6 +247,10 @@ Storage Class: standard
 
 Durability was tested by retrieving an existing payment successfully after replacing the application pod.
 
+## Optional online Grafana dashboard
+
+To host the **real Grafana panels** for public viewing, follow [Grafana Cloud setup](docs/GRAFANA-CLOUD.md). The free Cloud stack receives selected metrics through Prometheus `remote_write` when PayGuard is running locally. Import `observability/grafana/payguard-cloud-dashboard.json`, then share the Grafana dashboard externally. This needs your Grafana Cloud account, metrics instance ID, and a private `metrics:write` token; no credentials belong in this repository. GitHub Pages itself cannot host Prometheus or Grafana servers.
+
 ## Observability
 
 PayGuard includes a complete local metrics and logging stack.

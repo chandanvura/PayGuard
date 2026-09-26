@@ -40,3 +40,7 @@ kubernetes/secret.yaml
 
 # Local backup files
 *.backup.json
+
+# Optional Grafana Cloud configuration and token (local only)
+.secrets/
+observability/prometheus/prometheus-cloud.yml

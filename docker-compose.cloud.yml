@@ -1,0 +1,6 @@
+# Optional Grafana Cloud metrics forwarding. Use only after scripts/enable-cloud-metrics.ps1.
+services:
+  prometheus:
+    volumes:
+      - ./observability/prometheus/prometheus-cloud.yml:/etc/prometheus/prometheus.yml:ro
+      - ./.secrets/grafana-cloud-metrics-token:/etc/prometheus/cloud-token:ro
