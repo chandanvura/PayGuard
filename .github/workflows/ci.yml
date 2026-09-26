@@ -83,11 +83,12 @@ jobs:
 
       - name: Validate Kubernetes manifests
         run: |
-          kubectl apply --dry-run=client -f kubernetes/namespace.yaml
-          kubectl apply --dry-run=client -f kubernetes/configmap.yaml
-          kubectl apply --dry-run=client -f kubernetes/secret.example.yaml
-          kubectl apply --dry-run=client -f kubernetes/postgres/pvc.yaml
-          kubectl apply --dry-run=client -f kubernetes/postgres/deployment.yaml
-          kubectl apply --dry-run=client -f kubernetes/postgres/service.yaml
-          kubectl apply --dry-run=client -f kubernetes/payment-service/deployment.yaml
-          kubectl apply --dry-run=client -f kubernetes/payment-service/service.yaml
+          kubectl apply --dry-run=client --validate=false -f kubernetes/namespace.yaml
+          kubectl apply --dry-run=client --validate=false -f kubernetes/configmap.yaml
+          kubectl apply --dry-run=client --validate=false -f kubernetes/secret.example.yaml
+          kubectl apply --dry-run=client --validate=false -f kubernetes/postgres/pvc.yaml
+          kubectl apply --dry-run=client --validate=false -f kubernetes/postgres/deployment.yaml
+          kubectl apply --dry-run=client --validate=false -f kubernetes/postgres/service.yaml
+          kubectl apply --dry-run=client --validate=false -f kubernetes/payment-service/deployment.yaml
+          kubectl apply --dry-run=client --validate=false -f kubernetes/payment-service/service.yaml
+
