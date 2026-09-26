@@ -1,0 +1,51 @@
+discovery.docker "payguard" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "payguard" {
+  targets = discovery.docker.payguard.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+    replacement   = "$1"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_log_stream"]
+    target_label  = "stream"
+  }
+
+  rule {
+    target_label = "project"
+    replacement  = "payguard"
+  }
+}
+
+loki.source.docker "payguard" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.payguard.output
+  forward_to = [loki.process.payguard.receiver]
+}
+
+loki.process "payguard" {
+  forward_to = [loki.write.payguard.receiver]
+
+  stage.static_labels {
+    values = {
+      environment = "local",
+    }
+  }
+}
+
+loki.write "payguard" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

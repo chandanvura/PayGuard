@@ -1,9 +1,11 @@
 package com.payguard.payment_service.payment;
 
-
 public enum PaymentStatus {
+
     PENDING,
     PROCESSING,
     SUCCESS,
-    FAILED
+    FAILED,
+    UNKNOWN,
+    REQUIRES_REVIEW
 }

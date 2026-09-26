@@ -1,0 +1,222 @@
+groups:
+
+  # ============================================================
+  # PayGuard SLI / SLO Recording Rules
+  # ============================================================
+  - name: payguard-slo-recording-rules
+    interval: 5s
+
+    rules:
+
+      # --------------------------------------------------------
+      # Payment API request rate
+      #
+      # Includes:
+      #   POST /api/v1/payments
+      #   GET  /api/v1/payments/simulate-failure
+      #
+      # simulate-failure exists only for local SLO testing.
+      # --------------------------------------------------------
+      - record: payguard:sli_payment_requests:rate5m
+        expr: |
+          sum(
+            rate(
+              http_server_requests_seconds_count{
+                application="payment-service",
+                uri=~"/api/v1/payments(|/simulate-failure)"
+              }[5m]
+            )
+          )
+
+
+      # --------------------------------------------------------
+      # Payment API 5xx error rate
+      # --------------------------------------------------------
+      - record: payguard:sli_payment_errors:rate5m
+        expr: |
+          sum(
+            rate(
+              http_server_requests_seconds_count{
+                application="payment-service",
+                uri=~"/api/v1/payments(|/simulate-failure)",
+                status=~"5.."
+              }[5m]
+            )
+          ) or vector(0)
+
+
+      # --------------------------------------------------------
+      # Availability SLI
+      #
+      # availability =
+      #     1 - (5xx requests / total requests)
+      #
+      # Range:
+      #   1.0 = 100%
+      #   0.999 = 99.9%
+      # --------------------------------------------------------
+      - record: payguard:sli_availability:ratio5m
+        expr: |
+          1 -
+          (
+            payguard:sli_payment_errors:rate5m
+            /
+            clamp_min(payguard:sli_payment_requests:rate5m, 0.000000001)
+          )
+
+
+      # --------------------------------------------------------
+      # Error Ratio
+      #
+      # error ratio =
+      #     5xx requests / total requests
+      # --------------------------------------------------------
+      - record: payguard:sli_error:ratio5m
+        expr: |
+          payguard:sli_payment_errors:rate5m
+          /
+          clamp_min(payguard:sli_payment_requests:rate5m, 0.000000001)
+      # --------------------------------------------------------
+      # Availability SLO Burn Rate
+      #
+      # Availability target = 99.9%
+      #
+      # Allowed error ratio:
+      #
+      #     1 - 0.999 = 0.001
+      #
+      # burn rate:
+      #
+      #     actual error ratio / allowed error ratio
+      #
+      # Example:
+      #
+      # 0.01 / 0.001 = 10x burn
+      # --------------------------------------------------------
+      - record: payguard:slo_availability:burn_rate5m
+        expr: |
+          payguard:sli_error:ratio5m
+          /
+          0.001
+
+
+      # --------------------------------------------------------
+      # Latency SLI
+      #
+      # Fraction of REAL payment creation requests
+      # completing within 250ms.
+      #
+      # Notice that simulate-failure is intentionally NOT
+      # included in the latency SLI.
+      # --------------------------------------------------------
+      - record: payguard:sli_latency_250ms:ratio5m
+        expr: |
+          sum(
+            rate(
+              http_server_requests_seconds_bucket{
+                application="payment-service",
+                uri="/api/v1/payments",
+                le="0.25"
+              }[5m]
+            )
+          )
+          /
+          sum(
+            rate(
+              http_server_requests_seconds_count{
+                application="payment-service",
+                uri="/api/v1/payments"
+              }[5m]
+            )
+          )
+
+
+  # ============================================================
+  # PayGuard SLO Alerts
+  # ============================================================
+  - name: payguard-slo-alerts
+    interval: 5s
+
+    rules:
+
+      # --------------------------------------------------------
+      # WARNING
+      #
+      # Burn rate > 2 means we are consuming the error budget
+      # more than twice as fast as allowed.
+      # --------------------------------------------------------
+      - alert: PayGuardAvailabilityBurnRateWarning
+
+        expr: |
+          payguard:slo_availability:burn_rate5m > 2
+
+        for: 30s
+
+        labels:
+          severity: warning
+          service: payment-service
+          slo: availability
+
+        annotations:
+          summary: "PayGuard availability error budget is burning"
+
+          description: >-
+            PayGuard payment-service is consuming its 99.9%
+            availability error budget at more than 2x the
+            sustainable rate.
+
+
+      # --------------------------------------------------------
+      # CRITICAL
+      #
+      # 14.4x is a commonly useful fast-burn threshold for
+      # detecting severe availability degradation.
+      # --------------------------------------------------------
+      - alert: PayGuardAvailabilityBurnRateCritical
+
+        expr: |
+          payguard:slo_availability:burn_rate5m > 14.4
+
+        for: 30s
+
+        labels:
+          severity: critical
+          service: payment-service
+          slo: availability
+
+        annotations:
+          summary: "PayGuard availability SLO is burning rapidly"
+
+          description: >-
+            PayGuard payment-service is consuming its 99.9%
+            availability error budget at more than 14.4x the
+            sustainable rate.
+
+
+      # --------------------------------------------------------
+      # Latency SLO
+      #
+      # Target:
+      # at least 99% of payment creation requests <= 250ms.
+      # --------------------------------------------------------
+      - alert: PayGuardLatencySLOViolation
+
+        expr: |
+          payguard:sli_latency_250ms:ratio5m < 0.99
+          and
+          payguard:sli_payment_requests:rate5m > 0
+
+        for: 1m
+
+        labels:
+          severity: warning
+          service: payment-service
+          slo: latency
+
+        annotations:
+          summary: "PayGuard payment latency SLO violation"
+
+          description: >-
+            Less than 99% of PayGuard payment requests are
+            completing within the 250ms latency objective.
+

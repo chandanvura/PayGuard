@@ -1,6 +1,5 @@
 package com.payguard.payment_service.payment;
 
-
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -13,11 +12,17 @@ public record PaymentResponse(
         PaymentStatus status,
         String providerReference,
         String failureReason,
+        Integer reconciliationAttempts,
+        OffsetDateTime nextReconciliationAt,
+        boolean reconciliationExhausted,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
 
-    public static PaymentResponse from(Payment payment) {
+    public static PaymentResponse from(
+            Payment payment
+    ) {
+
         return new PaymentResponse(
                 payment.getId(),
                 payment.getIdempotencyKey(),
@@ -27,6 +32,9 @@ public record PaymentResponse(
                 payment.getStatus(),
                 payment.getProviderReference(),
                 payment.getFailureReason(),
+                payment.getReconciliationAttempts(),
+                payment.getNextReconciliationAt(),
+                payment.isReconciliationExhausted(),
                 payment.getCreatedAt(),
                 payment.getUpdatedAt()
         );

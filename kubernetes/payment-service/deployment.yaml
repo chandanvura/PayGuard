@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: payguard
+  labels:
+    app: payment-service
+spec:
+  replicas: 1
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
+  selector:
+    matchLabels:
+      app: payment-service
+
+  template:
+    metadata:
+      labels:
+        app: payment-service
+
+    spec:
+      containers:
+        - name: payment-service
+          image: payguard-payment-service:local
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 8081
+
+          env:
+            - name: DB_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payguard-config
+                  key: DB_URL
+
+            - name: FAILURE_SIMULATION_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: payguard-config
+                  key: FAILURE_SIMULATION_ENABLED
+
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: payguard-db-secret
+                  key: DB_USERNAME
+
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payguard-db-secret
+                  key: DB_PASSWORD
+
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8081
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8081
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8081
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 750m
+              memory: 512Mi
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL

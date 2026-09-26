@@ -1,0 +1,42 @@
+# IntelliJ
+.idea/
+*.iml
+
+# Java / Maven
+**/target/
+*.class
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Ansible
+*.retry
+
+# Temporary files
+*.tmp
+*.bak
+
+# Kubernetes local secrets
+kubernetes/secret.yaml
+
+# Local environment / secrets
+.env
+
+# Local backup files
+*.backup.json

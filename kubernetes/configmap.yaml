@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payguard-config
+  namespace: payguard
+data:
+  DB_URL: jdbc:postgresql://postgres:5432/payguard
+  FAILURE_SIMULATION_ENABLED: "true"

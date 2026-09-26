@@ -1,16 +1,16 @@
 services:
 
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17
     container_name: payguard-postgres
 
     environment:
-      POSTGRES_DB: payguard
-      POSTGRES_USER: payguard
-      POSTGRES_PASSWORD: payguard
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
     ports:
-      - "5432:5432"
+      - "15432:5432"
 
     volumes:
       - payguard-postgres-data:/var/lib/postgresql/data
@@ -18,8 +18,115 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U payguard -d payguard"]
       interval: 5s
-      timeout: 3s
-      retries: 5
+      timeout: 5s
+      retries: 10
+
+    restart: unless-stopped
+
+
+  payment-service:
+    image: payguard-payment-service:local
+    container_name: payguard-payment-service
+
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/payguard
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      FAILURE_SIMULATION_ENABLED: "true"
+
+    ports:
+      - "8081:8081"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: payguard-prometheus
+
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/rules:/etc/prometheus/rules:ro
+      - payguard-prometheus-data:/prometheus
+
+    ports:
+      - "9090:9090"
+
+    depends_on:
+      - payment-service
+
+    restart: unless-stopped
+
+
+  loki:
+    image: grafana/loki:latest
+    container_name: payguard-loki
+
+    command:
+      - "-config.file=/etc/loki/local-config.yaml"
+
+    ports:
+      - "3100:3100"
+
+    volumes:
+      - payguard-loki-data:/loki
+
+    restart: unless-stopped
+
+
+  alloy:
+    image: grafana/alloy:latest
+    container_name: payguard-alloy
+
+    command:
+      - "run"
+      - "/etc/alloy/config.alloy"
+      - "--storage.path=/var/lib/alloy/data"
+
+    volumes:
+      - ./observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - payguard-alloy-data:/var/lib/alloy/data
+
+    depends_on:
+      - loki
+
+    restart: unless-stopped
+
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: payguard-grafana
+
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+
+    ports:
+      - "3000:3000"
+
+    volumes:
+      - payguard-grafana-data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+
+    depends_on:
+      - prometheus
+      - loki
+
+    restart: unless-stopped
+
 
 volumes:
   payguard-postgres-data:
+  payguard-prometheus-data:
+  payguard-grafana-data:
+  payguard-loki-data:
+  payguard-alloy-data:
