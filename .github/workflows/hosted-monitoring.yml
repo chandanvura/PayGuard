@@ -43,7 +43,7 @@ jobs:
       - name: Capture real Grafana dashboard
         run: |
           npm install --no-save playwright
-          if command -v google-chrome >/dev/null; then echo "CHROME_PATH=$(command -v google-chrome)" >> "$GITHUB_ENV"; else npx playwright install chromium; fi
+          if command -v google-chrome >/dev/null; then export CHROME_PATH="$(command -v google-chrome)"; else npx playwright install chromium; fi
           node scripts/capture-grafana.mjs
       - name: Assemble site
         run: cp -a website/. site-output/
