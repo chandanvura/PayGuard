@@ -982,7 +982,7 @@ The playbook is intended to run from Linux/WSL.
 
 
 
-Runtime validation remains pending until Ansible is available in the WSL control environment.
+The playbook was runtime-validated successfully against the configured local environment. Re-run it when verifying a fresh local cluster; it reads state and does not deploy workloads.
 
 
 

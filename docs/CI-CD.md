@@ -990,13 +990,13 @@ Verified locally:
 
 - Ansible operational verification runtime
 
+- GitHub Actions CI, reliability demo, and hosted monitoring deployment
+
 
 
 Defined but pending execution in their actual external environments:
 
 
-
-- GitHub Actions workflow
 
 - Jenkins pipeline
 
