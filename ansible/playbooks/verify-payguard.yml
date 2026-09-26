@@ -4,7 +4,7 @@
   gather_facts: false
 
   vars:
-    namespace: payguard
+    payguard_namespace: payguard
     payment_deployment: payment-service
     postgres_deployment: postgres
 
@@ -16,34 +16,34 @@
 
     - name: Check Minikube status
       ansible.builtin.command:
-        cmd: minikube status
+        cmd: kubectl get nodes
       register: minikube_status
       changed_when: false
 
     - name: Verify PayGuard namespace
       ansible.builtin.command:
-        cmd: kubectl get namespace {{ namespace }}
+        cmd: kubectl get namespace {{ payguard_namespace }}
       changed_when: false
 
     - name: Verify payment-service rollout
       ansible.builtin.command:
-        cmd: kubectl rollout status deployment/{{ payment_deployment }} -n {{ namespace }} --timeout=60s
+        cmd: kubectl rollout status deployment/{{ payment_deployment }} -n {{ payguard_namespace }} --timeout=60s
       changed_when: false
 
     - name: Verify PostgreSQL rollout
       ansible.builtin.command:
-        cmd: kubectl rollout status deployment/{{ postgres_deployment }} -n {{ namespace }} --timeout=60s
+        cmd: kubectl rollout status deployment/{{ postgres_deployment }} -n {{ payguard_namespace }} --timeout=60s
       changed_when: false
 
     - name: Verify PostgreSQL PVC
       ansible.builtin.command:
-        cmd: kubectl get pvc postgres-data -n {{ namespace }}
+        cmd: kubectl get pvc postgres-data -n {{ payguard_namespace }}
       register: pvc_status
       changed_when: false
 
     - name: Verify application pods
       ansible.builtin.command:
-        cmd: kubectl get pods -n {{ namespace }}
+        cmd: kubectl get pods -n {{ payguard_namespace }}
       register: pod_status
       changed_when: false
 
