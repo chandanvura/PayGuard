@@ -1,10 +1,5 @@
 name: Portfolio site
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'website/**'
-      - '.github/workflows/pages.yml'
   workflow_dispatch:
 permissions:
   contents: read
