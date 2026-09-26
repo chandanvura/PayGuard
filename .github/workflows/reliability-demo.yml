@@ -1,0 +1,64 @@
+name: Reliability demo
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'payment-service/**'
+      - 'scripts/ci-demo.py'
+      - '.github/workflows/reliability-demo.yml'
+permissions:
+  contents: read
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: payguard
+          POSTGRES_USER: payguard_ci
+          POSTGRES_PASSWORD: payguard_ci_test_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U payguard_ci -d payguard"
+          --health-interval=5s --health-timeout=5s --health-retries=10
+    env:
+      DB_URL: jdbc:postgresql://localhost:5432/payguard
+      DB_USERNAME: payguard_ci
+      DB_PASSWORD: payguard_ci_test_only
+      FAILURE_SIMULATION_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: payment-service/pom.xml
+      - name: Start application
+        run: |
+          chmod +x payment-service/mvnw
+          cd payment-service
+          ./mvnw --batch-mode -DskipTests package
+          java -jar target/*.jar > "$RUNNER_TEMP/payguard-app.log" 2>&1 &
+      - name: Verify live reliability scenario
+        run: python3 scripts/ci-demo.py
+      - name: Add demonstration to run summary
+        if: always()
+        run: |
+          if [ -f demo-evidence.md ]; then cat demo-evidence.md >> "$GITHUB_STEP_SUMMARY"; else echo 'Demo failed before evidence was produced; inspect application log artifact.' >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: Collect application log
+        if: always()
+        run: cp "$RUNNER_TEMP/payguard-app.log" app.log || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: payguard-demo-evidence
+          path: |
+            demo-evidence.md
+            app.log
+          if-no-files-found: warn
+          retention-days: 30

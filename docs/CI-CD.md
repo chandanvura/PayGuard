@@ -838,15 +838,7 @@ The playbook is present in the repository.
 
 
 
-Ansible execution is not yet claimed as verified.
-
-
-
-The existing Ubuntu WSL environment currently does not have Ansible installed, and installation was blocked by unavailable sudo authentication.
-
-
-
-This is documented rather than presenting an unexecuted playbook as successfully validated.
+Ansible operational verification was successfully runtime-tested against the configured local environment. It checks cluster status, rollout readiness, PVC, and running pods; it does not deploy the service.
 
 
 
@@ -996,6 +988,8 @@ Verified locally:
 
 - Terraform idempotency
 
+- Ansible operational verification runtime
+
 
 
 Defined but pending execution in their actual external environments:
@@ -1005,10 +999,6 @@ Defined but pending execution in their actual external environments:
 - GitHub Actions workflow
 
 - Jenkins pipeline
-
-- Ansible verification playbook
-
-
 
 ## 29. Future CI/CD Improvements
 
@@ -1083,3 +1073,9 @@ A reliable delivery process must also verify:
 
 
 
+
+## Hosted reliability demonstration and Pages
+
+`.github/workflows/reliability-demo.yml` starts PostgreSQL 17 and the real Java service on a GitHub-hosted runner. `scripts/ci-demo.py` asserts health, successful payment, provider timeout after charge (UNKNOWN), same-ID retry, automatic reconciliation (SUCCESS), and Prometheus metrics. Run summaries and a downloadable artifact show evidence; no remote provider or payment account is involved. The workflow is available through manual dispatch and relevant pushes.
+
+`.github/workflows/pages.yml` deploys the static `website/` directory to GitHub Pages when the repository Pages source is configured to GitHub Actions. The site shows workflow badges and links to the actual run history; its diagrams explain the architecture, while runtime dashboards remain local.

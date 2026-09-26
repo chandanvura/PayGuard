@@ -131,6 +131,25 @@ V2__add_reconciliation_metadata.sql
 V3__backfill_exhausted_payments.sql
 ```
 
+## One-command Windows operation
+
+From the repository root in PowerShell:
+
+```powershell
+.\scripts\start.ps1
+.\scripts\status.ps1
+.\scripts\run-demo.ps1
+.\scripts\stop.ps1
+```
+
+Use `start.ps1 -Kubernetes` to also start Minikube. `stop.ps1 -StopMinikube` stops Minikube too. Stopping retains persistent volumes; neither command deletes database data. `start.ps1` requires a local `.env` containing `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`. Keep that file out of Git. The full local demo expects both Docker Compose and the PayGuard Minikube deployment to be running.
+
+## Portfolio site and hosted demonstration
+
+The static [PayGuard portfolio site](https://chandanvura.github.io/PayGuard/) is deployed by `.github/workflows/pages.yml` from `website/`. Repository settings must have **Pages → Build and deployment → Source: GitHub Actions**.
+
+The [Reliability demo workflow](https://github.com/chandanvura/PayGuard/actions/workflows/reliability-demo.yml) can be launched with **Run workflow**. It starts a temporary PostgreSQL service and Spring Boot process on a GitHub runner, verifies the timeout, idempotent retry, automatic reconciliation, health, and metrics, then publishes a run summary and 30-day evidence artifact. No laptop or paid host is involved. GitHub-hosted CI is a short-lived demonstration, not a persistent live payment API. The fake provider never charges real money.
+
 ## Running with Docker Compose
 
 Start the platform:
@@ -415,7 +434,7 @@ The playbook is designed to verify:
 
 The playbook is intended to execute from a Linux/WSL Ansible control environment.
 
-Runtime execution is still pending because Ansible is not currently installed in the Ubuntu WSL environment.
+Ansible operational verification has been runtime-tested successfully from the configured control environment. See `docs/CI-CD.md` for the scope of that check.
 
 ## Secrets and Repository Safety
 
@@ -519,12 +538,12 @@ Detailed documentation is available in:
 - Rollback
 - Terraform provisioning
 - Terraform idempotency
+- Ansible operational verification runtime
 
 ### Defined but Pending Runtime Validation
 
-- GitHub Actions execution after repository push
+- New GitHub Actions reliability demo and Pages deployment, pending their first successful run after this push
 - Jenkins execution on an actual Jenkins agent
-- Ansible execution from a configured Linux/WSL control node
 
 ## Purpose
 
