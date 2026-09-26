@@ -146,16 +146,16 @@ Use `start.ps1 -Kubernetes` to also start Minikube. `stop.ps1` stops Compose and
 
 ## Portfolio site and hosted demonstration
 
-The static [PayGuard portfolio site](https://chandanvura.github.io/PayGuard/) has separate [architecture](https://chandanvura.github.io/PayGuard/architecture.html), [learning](https://chandanvura.github.io/PayGuard/learning.html), [monitoring](https://chandanvura.github.io/PayGuard/monitoring.html), and [demo](https://chandanvura.github.io/PayGuard/demo.html) pages. It is deployed daily by `.github/workflows/hosted-monitoring.yml` with real, timestamped [Prometheus readings and Grafana capture](https://chandanvura.github.io/PayGuard/observability/latest/prometheus.html). `.github/workflows/pages.yml` is a manual site-only fallback and does not include monitoring evidence. Repository settings must have **Pages → Build and deployment → Source: GitHub Actions**.
+The static [PayGuard portfolio site](https://chandanvura.github.io/PayGuard/) has separate [architecture](https://chandanvura.github.io/PayGuard/architecture.html), [learning](https://chandanvura.github.io/PayGuard/learning.html), [monitoring](https://chandanvura.github.io/PayGuard/monitoring.html), and [demo](https://chandanvura.github.io/PayGuard/demo.html) pages. It is deployed daily by `.github/workflows/hosted-monitoring.yml` with real, timestamped [Prometheus readings and Grafana capture](https://chandanvura.github.io/PayGuard/observability/latest/prometheus.html). Repository settings must have **Pages → Build and deployment → Source: GitHub Actions**.
 
 The [Reliability demo workflow](https://github.com/chandanvura/PayGuard/actions/workflows/reliability-demo.yml) can be launched with **Run workflow**. It starts a temporary PostgreSQL service and Spring Boot process on a GitHub runner, verifies the timeout, idempotent retry, automatic reconciliation, health, and metrics, then publishes a run summary and 30-day evidence artifact. No laptop or paid host is involved. GitHub-hosted CI is a short-lived demonstration, not a persistent live payment API. The fake provider never charges real money.
 
 ## Running with Docker Compose
 
-Start the platform:
+Start the platform (the script creates a Grafana password in your ignored `.env` if needed):
 
 ```powershell
-docker compose up -d
+.\scripts\start.ps1
 ```
 
 Check the containers:

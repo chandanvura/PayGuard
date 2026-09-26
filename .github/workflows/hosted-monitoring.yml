@@ -7,6 +7,11 @@ on:
     branches: [main]
     paths:
       - 'website/**'
+      - 'payment-service/**'
+      - 'observability/**'
+      - 'docker-compose.yml'
+      - 'docker-compose.hosted.yml'
+      - 'scripts/ci-demo.py'
       - 'scripts/export-monitoring.py'
       - 'scripts/capture-grafana.mjs'
       - '.github/workflows/hosted-monitoring.yml'
