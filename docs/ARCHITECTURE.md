@@ -15,6 +15,8 @@ The system combines:
 
 
 - Java 21 and Spring Boot
+- Go standard-library health companion
+- Python reliability and monitoring automation
 
 - PostgreSQL 17
 
@@ -229,6 +231,7 @@ Services include:
 
 ```text
 payguard-payment-service
+payguard-sidecar
 payguard-postgres
 payguard-prometheus
 payguard-grafana
@@ -241,12 +244,15 @@ Current host ports:
 | Component | Port |
 |---|---:|
 | Payment Service | 8081 |
+| Go companion health and metrics | 9101 (localhost only) |
 | PostgreSQL | 15432 |
 | Grafana | 3000 |
 | Prometheus | 9090 |
 | Loki | 3100 |
 
 Inside the container network, services communicate using Docker DNS/service names rather than host ports.
+
+The Go companion shares the payment service network namespace in Compose. It checks the Java health endpoint every five seconds and exposes `/healthz` and `/metrics`. Prometheus scrapes its metrics through `payment-service:9101`. It only observes health; it does not process payments or restart the API.
 
 For example, containerized PostgreSQL remains reachable on port `5432`.
 
@@ -268,6 +274,7 @@ Architecture:
 |                                                |
 |  +------------------------------------------+  |
 |  | payment-service Deployment               |  |
+|  | Java API and Go companion in one pod      |  |
 |  |                                          |  |
 |  | Startup Probe                            |  |
 |  | Readiness Probe                          |  |
@@ -417,6 +424,8 @@ for documentation and manifest validation.
 PayGuard provides both metrics and centralized logs.
 
 ### Metrics Flow
+
+Prometheus scrapes both the Java Micrometer endpoint and the Go companion's probe metrics. Companion counters reset when its container restarts.
 
 ```text
 Spring Boot
@@ -686,6 +695,8 @@ PayGuard demonstrates several production-oriented design principles:
 
 ## 23. Verified Architecture Status
 
+The Go code checks, image build, and Kubernetes manifest validation passed in GitHub Actions. The hosted Compose sidecar check and site deployment require a successful hosted monitoring run. A live Minikube rollout of the added companion has not been verified.
+
 Verified locally:
 
 - Java 21 / Spring Boot application
@@ -717,5 +728,4 @@ Defined but requiring runtime/external validation:
 - GitHub Actions execution after repository push
 - Jenkins pipeline execution on a Jenkins agent
 - Ansible playbook execution after configuring the WSL control environment
-
 
