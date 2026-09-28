@@ -145,6 +145,8 @@ V3__backfill_exhausted_payments.sql
 
 ## One-command Windows operation
 
+For a fresh clone, credential setup, recovery of an old database volume after deleting the folder, start, verification, and stop, see **[Windows operations](docs/WINDOWS-OPERATIONS.md)**. Use PowerShell, not Command Prompt.
+
 From the repository root in PowerShell:
 
 ```powershell
