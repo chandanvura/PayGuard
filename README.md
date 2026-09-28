@@ -154,7 +154,7 @@ From the repository root in PowerShell:
 .\scripts\stop.ps1
 ```
 
-Use `start.ps1 -Kubernetes` to also start Minikube. `stop.ps1` stops Compose and Minikube by default; use `-KeepMinikube` to leave the cluster running. Stopping retains persistent volumes; neither command deletes database data. `start.ps1` requires a local `.env` containing `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`, and generates `GRAFANA_ADMIN_PASSWORD` there if missing. Keep that file out of Git. The local demo checks Compose services by default. Use `run-demo.ps1 -Kubernetes` to also verify the Minikube payment-service rollout. On a fresh machine, `start.ps1` builds the application image if it is missing.
+Use `start.ps1 -Kubernetes` to also start Minikube. `stop.ps1` stops Compose and Minikube by default; use `-KeepMinikube` to leave the cluster running. Stopping retains persistent volumes; neither command deletes database data. `start.ps1` requires a local `.env` containing `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`, and generates `GRAFANA_ADMIN_PASSWORD` there if missing. Keep that file out of Git. The local demo waits for API startup and checks payment recovery, the Go companion health and metrics, both Prometheus scrape targets, and the other Compose services. Use `run-demo.ps1 -Kubernetes` to also verify the Minikube payment-service rollout. On a fresh machine, `start.ps1` builds the application image if it is missing.
 
 ## Portfolio site and hosted demonstration
 

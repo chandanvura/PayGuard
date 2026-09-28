@@ -6,8 +6,27 @@ function Assert-Equal($label, $actual, $expected) {
     if ($actual -ne $expected) { throw "$label expected $expected but got $actual" }
     Write-Host "[PASS] $label : $actual"
 }
-$health = Invoke-RestMethod 'http://localhost:8081/actuator/health' -TimeoutSec 10
+$health = $null
+for ($i=0; $i -lt 60; $i++) {
+    try {
+        $health = Invoke-RestMethod 'http://localhost:8081/actuator/health' -TimeoutSec 4
+        if ($health.status -eq 'UP') { break }
+    } catch { }
+    Start-Sleep -Seconds 2
+}
 Assert-Equal 'API health' $health.status 'UP'
+$sidecar = $null
+for ($i=0; $i -lt 15; $i++) {
+    try {
+        $sidecar = Invoke-WebRequest -UseBasicParsing 'http://localhost:9101/healthz' -TimeoutSec 4
+        if ($sidecar.StatusCode -eq 200) { break }
+    } catch { }
+    Start-Sleep -Seconds 2
+}
+Assert-Equal 'Go companion health HTTP' $sidecar.StatusCode 200
+$sidecarMetrics = (Invoke-WebRequest -UseBasicParsing 'http://localhost:9101/metrics' -TimeoutSec 10).Content
+if ($sidecarMetrics -notmatch 'payguard_sidecar_up 1') { throw 'Go companion health metric missing or DOWN' }
+Write-Host '[PASS] Go companion probe metric UP'
 $body = @{ customerId='CUSTOMER-DEMO'; amount=149900; currency='INR' } | ConvertTo-Json
 $normal = Invoke-RestMethod -Method POST -Uri $base -Headers @{'Idempotency-Key'="DEMO-$([guid]::NewGuid())"} -ContentType 'application/json' -Body $body
 Assert-Equal 'normal payment' $normal.status 'SUCCESS'
@@ -27,8 +46,12 @@ $metrics = (Invoke-WebRequest -UseBasicParsing 'http://localhost:8081/actuator/p
 if ($metrics -notmatch 'payguard_') { throw 'PayGuard Prometheus metrics missing' }
 Write-Host '[PASS] PayGuard metrics exposed'
 $targets = Invoke-RestMethod 'http://localhost:9090/api/v1/targets' -TimeoutSec 10
-if (-not @($targets.data.activeTargets | Where-Object { $_.health -eq 'up' }).Count) { throw 'No healthy Prometheus target' }
-Write-Host '[PASS] Prometheus target UP'
+foreach ($job in @('payguard-payment-service', 'payguard-sidecar')) {
+    if (-not @($targets.data.activeTargets | Where-Object { $_.health -eq 'up' -and $_.labels.job -eq $job }).Count) {
+        throw "Prometheus target $job is not UP"
+    }
+    Write-Host "[PASS] Prometheus target $job UP"
+}
 $rules = Invoke-RestMethod 'http://localhost:9090/api/v1/rules' -TimeoutSec 10
 if (-not @($rules.data.groups | ForEach-Object { $_.rules } | Where-Object { $_.name -eq 'payguard:sli_availability:ratio5m' }).Count) { throw 'Availability SLI rule missing' }
 Write-Host '[PASS] SLI/SLO rules loaded'
