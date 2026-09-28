@@ -10,11 +10,13 @@ if (-not (Select-String -Path .env -Pattern '^GRAFANA_ADMIN_PASSWORD=' -Quiet)) 
     Add-Content -Path .env -Value "GRAFANA_ADMIN_PASSWORD=$password"
     Write-Host 'Generated a local Grafana admin password in .env.'
 }
-if (-not (docker image inspect payguard-payment-service:local 2>$null)) {
+$localImages = @(docker image ls --format '{{.Repository}}:{{.Tag}}')
+if ($LASTEXITCODE -ne 0) { throw 'Cannot list Docker images. Check that Docker Desktop is running.' }
+if ($localImages -notcontains 'payguard-payment-service:local') {
     docker build -t payguard-payment-service:local ./payment-service
     if ($LASTEXITCODE -ne 0) { throw 'Payment service image build failed.' }
 }
-if (-not (docker image inspect payguard-sidecar:local 2>$null)) {
+if ($localImages -notcontains 'payguard-sidecar:local') {
     docker build -t payguard-sidecar:local ./sidecar
     if ($LASTEXITCODE -ne 0) { throw 'Sidecar image build failed.' }
 }
