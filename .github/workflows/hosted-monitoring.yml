@@ -8,10 +8,12 @@ on:
     paths:
       - 'website/**'
       - 'payment-service/**'
+      - 'sidecar/**'
       - 'observability/**'
       - 'docker-compose.yml'
       - 'docker-compose.hosted.yml'
       - 'scripts/ci-demo.py'
+      - 'scripts/check-sidecar.py'
       - 'scripts/export-monitoring.py'
       - 'scripts/capture-grafana.mjs'
       - '.github/workflows/hosted-monitoring.yml'
@@ -32,18 +34,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build application image
-        run: docker build -t payguard-payment-service:local ./payment-service
+        run: |
+          docker build -t payguard-payment-service:local ./payment-service
+          docker build -t payguard-sidecar:local ./sidecar
       - name: Start observability stack
         run: |
           printf 'POSTGRES_DB=payguard\nPOSTGRES_USER=payguard\nPOSTGRES_PASSWORD=runner_only_password\nGRAFANA_ADMIN_PASSWORD=%s\n' "$(openssl rand -hex 24)" > .env
           chmod 600 .env
-          docker compose -f docker-compose.yml -f docker-compose.hosted.yml up -d postgres payment-service prometheus loki grafana
+          docker compose -f docker-compose.yml -f docker-compose.hosted.yml up -d postgres payment-service sidecar prometheus loki grafana
       - name: Exercise live payment recovery
         env:
           PAYGUARD_EVIDENCE: site-output/observability/latest/demo-evidence.md
         run: |
           mkdir -p site-output/observability/latest
           python3 scripts/ci-demo.py
+      - name: Check companion probe
+        run: python3 scripts/check-sidecar.py
       - name: Export real Prometheus query results
         run: python3 scripts/export-monitoring.py
       - name: Capture real Grafana dashboard
@@ -69,4 +75,4 @@ jobs:
           retention-days: 30
       - name: Show logs if capture fails
         if: failure()
-        run: docker compose -f docker-compose.yml -f docker-compose.hosted.yml logs --tail=100 payment-service prometheus grafana
+        run: docker compose -f docker-compose.yml -f docker-compose.hosted.yml logs --tail=100 payment-service sidecar prometheus grafana

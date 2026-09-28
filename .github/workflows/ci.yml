@@ -69,6 +69,19 @@ jobs:
       - name: Build payment-service image
         run: docker build -t payguard-payment-service:ci ./payment-service
 
+      - name: Build Go sidecar image
+        run: docker build -t payguard-sidecar:ci ./sidecar
+
+  sidecar:
+    name: Go Sidecar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: sidecar/go.mod
+      - run: cd sidecar && go test ./... && go vet ./...
+
   kubernetes:
     name: Kubernetes Validation
     runs-on: ubuntu-latest

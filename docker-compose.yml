@@ -36,11 +36,20 @@ services:
 
     ports:
       - "127.0.0.1:8081:8081"
+      - "127.0.0.1:9101:9101"
 
     depends_on:
       postgres:
         condition: service_healthy
 
+    restart: unless-stopped
+
+  sidecar:
+    image: payguard-sidecar:local
+    network_mode: "service:payment-service"
+    depends_on:
+      payment-service:
+        condition: service_started
     restart: unless-stopped
 
 

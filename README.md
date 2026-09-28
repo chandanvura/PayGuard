@@ -7,6 +7,8 @@ The project models payment processing where duplicate requests, provider failure
 ## What PayGuard Demonstrates
 
 - Java 21 + Spring Boot payment API
+- Lightweight Go companion probe in Compose and the Kubernetes payment pod
+- Python automation for reliability demonstrations, monitoring export, and sidecar checks
 - PostgreSQL 17 persistence
 - Flyway database migrations
 - Idempotent payment processing
@@ -87,6 +89,8 @@ See `docs/ARCHITECTURE.md` for the detailed architecture.
 | Area | Technology |
 |---|---|
 | Language | Java 21 |
+| Companion | Go (standard library only) |
+| Automation | Python 3 (standard library for demo and sidecar check) |
 | Framework | Spring Boot |
 | Build | Maven Wrapper |
 | Database | PostgreSQL 17 |
@@ -100,6 +104,14 @@ See `docs/ARCHITECTURE.md` for the detailed architecture.
 | Pipeline | Jenkins |
 | Infrastructure as Code | Terraform |
 | Configuration / Operations | Ansible |
+
+## Go companion and Python automation
+
+`sidecar/` contains a small Go HTTP health observer. Every five seconds it checks the Spring Boot health endpoint and exposes `/healthz` and Prometheus `/metrics` on port 9101. It shares the API network namespace in Compose and its pod network in Kubernetes. It does not process payments, reconcile records, or restart the API; Kubernetes and Compose own restarts. Its counters reset when the companion restarts. The Compose host mapping is restricted to `127.0.0.1`.
+
+`scripts/ci-demo.py` checks real payment, timeout, idempotency and reconciliation behavior. `scripts/export-monitoring.py` exports dated monitoring evidence. `scripts/check-sidecar.py` verifies the running Go companion in the hosted Compose workflow. Hosted monitoring still runs temporarily on GitHub Actions and publishes a dated capture; the public site is not a permanent API or monitoring server.
+
+The hosted workflow builds both images and exercises the companion. CI builds and checks its Go code. Kubernetes manifests include the companion, but this change has only schema validation there; a live Minikube rollout is a separate runtime check.
 
 ## Payment Reliability
 

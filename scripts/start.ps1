@@ -13,6 +13,10 @@ if (-not (docker image inspect payguard-payment-service:local 2>$null)) {
     docker build -t payguard-payment-service:local ./payment-service
     if ($LASTEXITCODE -ne 0) { throw 'Payment service image build failed.' }
 }
+if (-not (docker image inspect payguard-sidecar:local 2>$null)) {
+    docker build -t payguard-sidecar:local ./sidecar
+    if ($LASTEXITCODE -ne 0) { throw 'Sidecar image build failed.' }
+}
 if (Test-Path observability/prometheus/prometheus-cloud.yml) {
     if (-not (Test-Path .secrets/grafana-cloud-metrics-token)) { throw 'Cloud token missing; rerun enable-cloud-metrics.ps1.' }
     docker compose -f docker-compose.yml -f docker-compose.cloud.yml up -d

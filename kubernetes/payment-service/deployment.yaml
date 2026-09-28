@@ -25,6 +25,30 @@ spec:
 
     spec:
       containers:
+        - name: sidecar
+          image: payguard-sidecar:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: probe-metrics
+              containerPort: 9101
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 9101
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 32Mi
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
         - name: payment-service
           image: payguard-payment-service:local
           imagePullPolicy: IfNotPresent
