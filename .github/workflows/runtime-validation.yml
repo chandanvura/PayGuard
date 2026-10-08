@@ -1,0 +1,91 @@
+name: Infrastructure runtime validation
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'sidecar/**'
+      - 'kubernetes/**'
+      - 'terraform/**'
+      - 'ansible/**'
+      - 'scripts/ci-demo.py'
+      - '.github/workflows/runtime-validation.yml'
+permissions:
+  contents: read
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create temporary Kubernetes cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: payguard-test
+      - name: Build and load both application images
+        run: |
+          docker build -t payguard-payment-service:local ./payment-service
+          docker build -t payguard-sidecar:local ./sidecar
+          kind load docker-image --name payguard-test payguard-payment-service:local payguard-sidecar:local
+      - name: Deploy and wait for both containers
+        run: |
+          kubectl apply -f kubernetes/namespace.yaml
+          kubectl apply -f kubernetes/configmap.yaml
+          kubectl create secret generic payguard-db-secret -n payguard --from-literal=DB_USERNAME=payguard --from-literal=DB_PASSWORD="$(openssl rand -hex 24)"
+          kubectl apply -f kubernetes/postgres/
+          kubectl rollout status deployment/postgres -n payguard --timeout=180s
+          kubectl apply -f kubernetes/payment-service/
+          kubectl rollout status deployment/payment-service -n payguard --timeout=240s
+          kubectl port-forward -n payguard deployment/payment-service 8081:8081 9101:9101 > "$RUNNER_TEMP/port-forward.log" 2>&1 &
+      - name: Exercise real payment and companion behavior in Kubernetes
+        run: |
+          python3 scripts/ci-demo.py
+          python3 scripts/check-sidecar.py
+      - name: Verify pod replacement and persisted payment
+        run: |
+          python3 - <<'PY'
+          import json, urllib.request, uuid
+          request = urllib.request.Request('http://localhost:8081/api/v1/payments', data=json.dumps({'customerId':'K8S-DURABILITY','amount':149900,'currency':'INR'}).encode(), headers={'Content-Type':'application/json','Idempotency-Key':'CI-'+uuid.uuid4().hex})
+          with urllib.request.urlopen(request, timeout=10) as response:
+              payment=json.load(response)
+          assert payment['status']=='SUCCESS', payment
+          open('/tmp/payguard-payment-id','w').write(payment['id'])
+          PY
+          kubectl delete pod -n payguard -l app=payment-service
+          kubectl rollout status deployment/payment-service -n payguard --timeout=240s
+          kubectl port-forward -n payguard deployment/payment-service 8081:8081 9101:9101 > "$RUNNER_TEMP/replacement-forward.log" 2>&1 &
+          python3 scripts/check-sidecar.py
+          python3 - <<'PY'
+          import json, urllib.request
+          payment_id=open('/tmp/payguard-payment-id').read()
+          with urllib.request.urlopen('http://localhost:8081/api/v1/payments/'+payment_id,timeout=10) as response:
+              payment=json.load(response)
+          assert payment['id']==payment_id and payment['status']=='SUCCESS', payment
+          print('Persisted payment survived replacement; new Java and Go containers are ready.')
+          PY
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.14.0'
+          terraform_wrapper: false
+      - name: Terraform apply and no-change plan
+        working-directory: terraform
+        run: |
+          terraform init -input=false
+          terraform validate
+          terraform apply -input=false -auto-approve -var='kubernetes_context=kind-payguard-test'
+          terraform plan -input=false -detailed-exitcode -var='kubernetes_context=kind-payguard-test'
+      - name: Execute Ansible operational verification against the cluster
+        run: |
+          python3 -m pip install ansible-core
+          cd ansible
+          ansible-playbook playbooks/verify-payguard.yml
+      - name: Capture failure diagnostics
+        if: failure()
+        run: |
+          kubectl get pods,pvc -n payguard
+          kubectl describe pods -n payguard
+          kubectl logs -n payguard deployment/payment-service -c payment-service --tail=100 || true
+          kubectl logs -n payguard deployment/payment-service -c sidecar --tail=100 || true
+      - name: Delete temporary cluster
+        if: always()
+        run: kind delete cluster --name payguard-test

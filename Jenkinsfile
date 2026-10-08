@@ -44,6 +44,7 @@ pipeline {
         stage('Docker Build') {
             steps {
                 bat 'docker build -t %IMAGE_NAME%:%BUILD_NUMBER% payment-service'
+                bat 'docker build -t payguard-sidecar:%BUILD_NUMBER% sidecar'
             }
         }
 

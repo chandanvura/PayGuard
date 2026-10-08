@@ -80,7 +80,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: sidecar/go.mod
-      - run: cd sidecar && go test ./... && go vet ./...
+      - run: cd sidecar && go test -race ./... && go vet ./...
 
   powershell:
     name: PowerShell scripts parse
