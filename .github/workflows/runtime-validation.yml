@@ -37,6 +37,7 @@ jobs:
           kubectl apply -f kubernetes/payment-service/
           kubectl rollout status deployment/payment-service -n payguard --timeout=240s
           kubectl port-forward -n payguard deployment/payment-service 8081:8081 9101:9101 > "$RUNNER_TEMP/port-forward.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/port-forward.pid"
       - name: Exercise real payment and companion behavior in Kubernetes
         run: |
           python3 scripts/ci-demo.py
@@ -51,6 +52,7 @@ jobs:
           assert payment['status']=='SUCCESS', payment
           open('/tmp/payguard-payment-id','w').write(payment['id'])
           PY
+          kill "$(cat "$RUNNER_TEMP/port-forward.pid")" || true
           kubectl delete pod -n payguard -l app=payment-service
           kubectl rollout status deployment/payment-service -n payguard --timeout=240s
           kubectl port-forward -n payguard deployment/payment-service 8081:8081 9101:9101 > "$RUNNER_TEMP/replacement-forward.log" 2>&1 &

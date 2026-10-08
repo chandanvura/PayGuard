@@ -1,4 +1,5 @@
 """Check the real sidecar in a temporary hosted Compose stack."""
+import http.client
 import time
 import urllib.error
 import urllib.request
@@ -9,7 +10,7 @@ for attempt in range(30):
         with urllib.request.urlopen(URL + '/healthz', timeout=3) as response:
             assert response.read().strip() == b'ok'
         break
-    except (urllib.error.URLError, AssertionError):
+    except (urllib.error.URLError, http.client.HTTPException, OSError, AssertionError):
         if attempt == 29:
             raise
         time.sleep(2)
