@@ -1,5 +1,7 @@
 # PayGuard Operations Runbook
 
+For current first-time setup, PowerShell start/demo/stop commands, image builds, and retained-volume credential recovery, use the [Windows operations guide](../WINDOWS-OPERATIONS.md). The commands below cover additional operational scenarios; enter your actual clone directory rather than assuming the example path. Current validation evidence is recorded in [VALIDATION.md](../VALIDATION.md).
+
 
 
 ## 1. Purpose

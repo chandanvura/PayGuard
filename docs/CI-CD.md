@@ -1022,7 +1022,7 @@ Possible future enhancements include:
 
 - Automated rollback policies
 
-- Terraform CI plans
+- Pull-request review of Terraform plans
 
 - Ansible linting
 
@@ -1079,3 +1079,8 @@ A reliable delivery process must also verify:
 `.github/workflows/reliability-demo.yml` starts PostgreSQL 17 and the real Java service on a GitHub-hosted runner. `scripts/ci-demo.py` asserts health, successful payment, provider timeout after charge (UNKNOWN), same-ID retry, automatic reconciliation (SUCCESS), and Prometheus metrics. Run summaries and a downloadable artifact show evidence; no remote provider or payment account is involved. The workflow is available through manual dispatch and relevant pushes.
 
 `.github/workflows/hosted-monitoring.yml` builds the real application and observability stack on a temporary GitHub runner. It runs the reliability scenario, captures Prometheus queries and a Grafana dashboard image, then deploys the static site and timestamped evidence to GitHub Pages. It runs daily, on relevant changes, or on manual dispatch. The runner shuts down afterward; the public page is a dated capture, while live Grafana, Loki, and Prometheus servers run only during the workflow or locally.
+
+
+## Live infrastructure runtime validation
+
+`.github/workflows/runtime-validation.yml` creates a temporary kind cluster, builds and loads both Java and Go images, applies the repository manifests with an ephemeral secret, and waits for both payment-pod containers. It runs real payment/reconciliation checks, replaces the API pod, and verifies the persisted payment and replacement companion. It then executes Terraform apply/no-change plan and the Ansible operational playbook. The run passed on 8 October 2026; see [validation evidence](VALIDATION.md). Go behavior tests run with race detection in `ci.yml`. The Windows Jenkinsfile now builds both images, but its execution remains unverified on a configured Jenkins agent.

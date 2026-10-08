@@ -1,576 +1,189 @@
 # PayGuard
 
-PayGuard is a local-first payment reliability platform built to demonstrate backend engineering, DevOps, Kubernetes, observability, SRE practices, CI/CD, and Infrastructure as Code without requiring a paid cloud account.
+PayGuard is a local-first payment reliability portfolio built with Java, Go, Python, and a DevOps/SRE stack. It demonstrates how to handle a provider timeout **after a simulated charge** without creating a second payment: record `UNKNOWN`, return the same payment ID on retry, and reconcile to `SUCCESS`.
 
-The project models payment processing where duplicate requests, provider failures, retries, reconciliation, persistence, observability, deployment failures, and recovery must be handled reliably.
+The provider is a simulation. No real money is charged, and the local stack requires no cloud account.
 
-## What PayGuard Demonstrates
+**[Portfolio](https://chandanvura.github.io/PayGuard/) · [Interactive replay](https://chandanvura.github.io/PayGuard/dashboard.html) · [Timestamped monitoring evidence](https://chandanvura.github.io/PayGuard/observability/latest/prometheus.html) · [Test evidence](docs/VALIDATION.md) · [Windows start/stop guide](docs/WINDOWS-OPERATIONS.md)**
 
-- Java 21 + Spring Boot payment API
-- Lightweight Go companion probe in Compose and the Kubernetes payment pod
-- Python automation for reliability demonstrations, monitoring export, and sidecar checks
-- PostgreSQL 17 persistence
-- Flyway database migrations
-- Idempotent payment processing
-- Simulated payment-provider failures
-- Payment reconciliation workflow
-- Prometheus application metrics
-- Grafana dashboards
-- Loki centralized logging
-- Grafana Alloy log collection
-- SLI/SLO recording and alerting rules
-- Docker and Docker Compose
-- Kubernetes on Minikube
-- Liveness, readiness, and startup probes
-- Kubernetes self-healing
-- PersistentVolumeClaims
-- Horizontal replica scaling
-- Rolling deployments and rollback
-- GitHub Actions CI
-- Jenkins pipeline-as-code
-- Terraform-managed Kubernetes resources
-- Ansible operational verification playbook
+## What is implemented
 
-## Architecture
-
-```text
-                    Client
-                      |
-                      v
-              +----------------+
-              | Payment API    |
-              | Spring Boot    |
-              +-------+--------+
-                      |
-          +-----------+-----------+
-          |                       |
-          v                       v
- +----------------+       +----------------+
- | PostgreSQL     |       | Fake Payment   |
- | Payment State  |       | Provider       |
- +----------------+       +----------------+
-          ^
-          |
- +----------------------+
- | Reconciliation Worker|
- +----------------------+
-
-Observability:
-
-Payment Service ---> Prometheus ---> Grafana
-       |
-       +-----------> Alloy ---> Loki ---> Grafana
-
-Deployment:
-
-Source
-  |
-  +--> GitHub Actions
-  |
-  +--> Jenkins
-  |
-Docker Image
-  |
-Kubernetes / Minikube
-  |
-  +--> payment-service
-  +--> PostgreSQL + PVC
-
-Infrastructure / Operations:
-
-Terraform ---> Kubernetes resources
-Ansible   ---> Operational verification
-```
-
-See `docs/ARCHITECTURE.md` for the detailed architecture.
-
-## Technology Stack
-
-| Area | Technology |
+| Area | Implementation and scope |
 |---|---|
-| Language | Java 21 |
-| Companion | Go (standard library only) |
-| Automation | Python 3 (standard library for demo and sidecar check) |
-| Framework | Spring Boot |
-| Build | Maven Wrapper |
-| Database | PostgreSQL 17 |
-| Database Migration | Flyway |
-| Containers | Docker / Docker Compose |
-| Orchestration | Kubernetes / Minikube |
-| Metrics | Prometheus |
-| Dashboards | Grafana |
-| Logs | Loki + Grafana Alloy |
-| CI | GitHub Actions |
-| Pipeline | Jenkins |
-| Infrastructure as Code | Terraform |
-| Configuration / Operations | Ansible |
+| Payment API | Java 21, Spring Boot, Maven Wrapper, PostgreSQL 17, Flyway migrations, JPA schema validation |
+| Reliability | Idempotency, concurrent-request integration tests, simulated provider failures, bounded reconciliation with attempt metadata |
+| Go companion | Standard-library health observer; checks the Java API every five seconds; exposes health and probe metrics |
+| Python automation | Payment/reconciliation demo, Go companion checks, Prometheus evidence export |
+| Containers | Docker Compose; Java and Go images; localhost host bindings |
+| Kubernetes | API pod with Java and Go containers, PostgreSQL PVC, probes, resource requests/limits; Minikube configuration and temporary kind CI tests |
+| Observability | Micrometer → Prometheus → Grafana; container logs → Alloy → Loki → Grafana |
+| SRE | Availability and latency SLIs, recording rules, error-budget burn-rate and latency alert rules |
+| CI | GitHub Actions: Java tests, Go race tests/vet, image builds, PowerShell parsing, manifest validation, live infrastructure checks |
+| Jenkins | Windows Jenkinsfile: Java tests/package, both Docker image builds, Kubernetes dry-run validation, JUnit/artifacts; execution pending |
+| Terraform | Isolated `payguard-iac` namespace and ConfigMap; apply/idempotency tested; does not deploy application workloads |
+| Ansible | Operational verification of nodes, namespace, rollouts, PVC, and pods; does not deploy the platform |
 
-## Go companion and Python automation
+## Architecture and payment flow
 
-`sidecar/` contains a small Go HTTP health observer. Every five seconds it checks the Spring Boot health endpoint and exposes `/healthz` and Prometheus `/metrics` on port 9101. It shares the API network namespace in Compose and its pod network in Kubernetes. It does not process payments, reconcile records, or restart the API; Kubernetes and Compose own restarts. Its counters reset when the companion restarts. The Compose host mapping is restricted to `127.0.0.1`.
-
-`scripts/ci-demo.py` checks real payment, timeout, idempotency and reconciliation behavior. `scripts/export-monitoring.py` exports dated monitoring evidence. `scripts/check-sidecar.py` verifies the running Go companion in the hosted Compose workflow. Hosted monitoring still runs temporarily on GitHub Actions and publishes a dated capture; the public site is not a permanent API or monitoring server.
-
-The hosted workflow builds both images and exercises the companion. CI runs Go behavior tests with race detection. The infrastructure runtime workflow deploys the real manifests to a temporary kind cluster, verifies payment recovery and both containers, replaces the API pod, and checks persisted payment data. It also runs Terraform apply/no-change plan and Ansible verification. See [validation evidence and remaining limits](docs/VALIDATION.md). The exact local Minikube setup remains a separate check.
-
-## Payment Reliability
-
-PayGuard is designed around payment reliability rather than simple CRUD operations.
-
-### Idempotency
-
-Payment requests use an idempotency key to protect against accidental duplicate payment creation.
-
-### Provider Failure Simulation
-
-The fake payment provider allows failure scenarios to be reproduced locally without requiring an external payment gateway.
-
-### Reconciliation
-
-PayGuard includes a reconciliation worker for payments requiring follow-up processing.
-
-Reconciliation metadata includes:
-
-- Reconciliation attempts
-- Next reconciliation time
-- Reconciliation exhaustion state
-
-Database evolution is managed through:
-
-```text
-V1__create_payments_table.sql
-V2__add_reconciliation_metadata.sql
-V3__backfill_exhausted_payments.sql
+```mermaid
+flowchart TD
+  Client["Client: Idempotency-Key"] --> API["Java payment API"]
+  API --> DB["PostgreSQL: payment state"]
+  API --> Provider["Simulated payment provider"]
+  Worker["Java reconciliation worker"] --> Provider
+  Worker --> DB
+  Go["Go health companion"] --> API
+  API --> Prom["Prometheus"]
+  Go --> Prom
+  Prom --> Grafana["Grafana dashboards"]
 ```
 
-## One-command Windows operation
+A normal request becomes `SUCCESS`. For the timeout scenario, the provider records success and then throws; the API stores `UNKNOWN`. Retrying with the same key returns the same payment ID. The reconciliation worker checks the provider and updates the stored result. Flyway owns schema changes through migrations V1–V3; JPA validates the schema.
 
-For a fresh clone, credential setup, recovery of an old database volume after deleting the folder, start, verification, and stop, see **[Windows operations](docs/WINDOWS-OPERATIONS.md)**. Use PowerShell, not Command Prompt.
+The Go companion shares the Java container's network namespace in Compose and its pod network in Kubernetes. Its counters reset on restart. It observes health; reconciliation stays in Java, and container/pod restarts belong to Compose/Kubernetes.
 
-From the repository root in PowerShell:
+## Run locally on Windows
+
+Use **PowerShell**, with Docker Desktop running. A PowerShell prompt begins with `PS`; from Command Prompt, enter `powershell -NoProfile`. Git and Docker are required for Compose; Docker builds Java and Go, so separate local Java/Go installs are unnecessary for this path.
+
+For a fresh clone and `.env` setup, follow [Windows operations](docs/WINDOWS-OPERATIONS.md). That guide also covers your actual nested checkout and recovery when a database volume survives deletion of the project folder. **Keep the existing `.env` when reusing a database volume.** Generating a different password does not change the password stored in PostgreSQL.
+
+From the directory containing `docker-compose.yml`:
 
 ```powershell
 .\scripts\start.ps1
 .\scripts\status.ps1
 .\scripts\run-demo.ps1
-.\scripts\stop.ps1
 ```
 
-Use `start.ps1 -Kubernetes` to also start Minikube. `stop.ps1` stops Compose and Minikube by default; use `-KeepMinikube` to leave the cluster running. Stopping retains persistent volumes; neither command deletes database data. `start.ps1` requires a local `.env` containing `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`, and generates `GRAFANA_ADMIN_PASSWORD` there if missing. Keep that file out of Git. The local demo waits for API startup and checks payment recovery, the Go companion health and metrics, both Prometheus scrape targets, and the other Compose services. Use `run-demo.ps1 -Kubernetes` to also verify the Minikube payment-service rollout. On a fresh machine, `start.ps1` builds the application image if it is missing.
+The start script generates a Grafana password in the ignored `.env` if missing and builds absent images. The demo waits for API startup and verifies payment success, timeout, same-ID retry, reconciliation, Go health/metrics, both Prometheus targets, SLI/SLO rules, Loki, and Grafana.
 
-## Portfolio site and hosted demonstration
+| Local service | Address |
+|---|---|
+| API health | <http://localhost:8081/actuator/health> |
+| Go companion health | <http://localhost:9101/healthz> |
+| Go metrics | <http://localhost:9101/metrics> |
+| Grafana | <http://localhost:3000> |
+| Prometheus | <http://localhost:9090> |
+| Loki readiness | <http://localhost:3100/ready> |
+| PostgreSQL | `localhost:15432` (container port `5432`) |
 
-The static [PayGuard portfolio site](https://chandanvura.github.io/PayGuard/) has separate [architecture](https://chandanvura.github.io/PayGuard/architecture.html), [learning](https://chandanvura.github.io/PayGuard/learning.html), [monitoring](https://chandanvura.github.io/PayGuard/monitoring.html), and [demo](https://chandanvura.github.io/PayGuard/demo.html) pages. It is deployed daily by `.github/workflows/hosted-monitoring.yml` with real, timestamped [Prometheus readings and Grafana capture](https://chandanvura.github.io/PayGuard/observability/latest/prometheus.html). Repository settings must have **Pages → Build and deployment → Source: GitHub Actions**.
-
-The [Reliability demo workflow](https://github.com/chandanvura/PayGuard/actions/workflows/reliability-demo.yml) can be launched with **Run workflow**. It starts a temporary PostgreSQL service and Spring Boot process on a GitHub runner, verifies the timeout, idempotent retry, automatic reconciliation, health, and metrics, then publishes a run summary and 30-day evidence artifact. No laptop or paid host is involved. GitHub-hosted CI is a short-lived demonstration, not a persistent live payment API. The fake provider never charges real money.
-
-## Running with Docker Compose
-
-Start the platform (the script creates a Grafana password in your ignored `.env` if needed):
+Stop Compose while keeping an existing Minikube cluster running:
 
 ```powershell
+.\scripts\stop.ps1 -KeepMinikube
+```
+
+To stop Compose **and Minikube**, run `.\scripts\stop.ps1`. Both retain database volumes. Do not use `docker compose down -v` when you want to keep data.
+
+Return later from the same directory:
+
+```powershell
+git pull --ff-only
+.\scripts\start.ps1
+.\scripts\run-demo.ps1
+```
+
+The start script builds only absent images. After pulling changes to application code or Dockerfiles, rebuild existing images before starting:
+
+```powershell
+docker build -t payguard-payment-service:local .\payment-service
+docker build -t payguard-sidecar:local .\sidecar
 .\scripts\start.ps1
 ```
 
-Check the containers:
+## Portfolio and hosted monitoring
 
-```powershell
-docker compose ps
-```
+GitHub Pages hosts the [architecture](https://chandanvura.github.io/PayGuard/architecture.html), [learning guide](https://chandanvura.github.io/PayGuard/learning.html), [monitoring explanation](https://chandanvura.github.io/PayGuard/monitoring.html), and [demo instructions](https://chandanvura.github.io/PayGuard/demo.html).
 
-Current local services:
+The hosted workflow temporarily starts the real API, PostgreSQL, Go companion, Prometheus, Loki, and Grafana; checks payment recovery; exports Prometheus results; captures Grafana; and deploys static evidence. It runs daily and on relevant changes/manual dispatch. The site remains accessible without your laptop, but its monitoring output is a **dated capture**, not a permanent public payment API or monitoring server.
 
-| Service | Address |
+[Grafana Cloud forwarding](docs/GRAFANA-CLOUD.md) is optional, requires your own account/token, and is not needed for the portfolio. No configured Grafana Cloud deployment is claimed.
+
+## Tests and verification
+
+The application/test commit `0befc2a` passed on **8 October 2026**:
+
+| Evidence | What actually ran |
 |---|---|
-| Payment Service | http://localhost:8081 |
-| Grafana | http://localhost:3000 |
-| Prometheus | http://localhost:9090 |
-| Loki | http://localhost:3100 |
-| PostgreSQL | localhost:15432 |
+| [CI](https://github.com/chandanvura/PayGuard/actions/runs/37754273510) | Java tests with PostgreSQL, Go behavior tests with race detection and vet, both image builds, PowerShell syntax parsing, Kubernetes schema validation |
+| [Infrastructure runtime](https://github.com/chandanvura/PayGuard/actions/runs/37754273454) | Real manifests in kind; both containers ready; payment/reconciliation demo; pod replacement and retained payment; Terraform apply/no-change plan; Ansible playbook |
+| [Hosted monitoring](https://github.com/chandanvura/PayGuard/actions/runs/37754273530) | Compose payment/Go checks, Prometheus export, Grafana capture, Pages deployment |
 
-Check application health:
+The Windows Compose demo also passed locally on 28 September 2026. See [validation details and limits](docs/VALIDATION.md). A kind run verifies the repository manifests on that cluster; it does not verify your exact Minikube installation.
 
-```powershell
-Invoke-RestMethod http://localhost:8081/actuator/health
-```
-
-Stop the environment:
+Run Java tests locally with Java 21 and the database running (set `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` to match your local `.env`; the host database port is `15432`):
 
 ```powershell
-docker compose down
+cd .\payment-service
+.\mvnw.cmd --batch-mode clean test
+cd ..
 ```
+
+With Go installed, run companion tests from the repository root:
+
+```powershell
+cd .\sidecar
+go test -race ./...
+go vet ./...
+cd ..
+```
+
+Race testing requires a supported compiler toolchain, including a C compiler. Go tests cover unhealthy startup, failure/recovery, timeout, invalid target, metrics counters, and HTTP methods/routes. Python `scripts/ci-demo.py` and `scripts/check-sidecar.py` exercise running services; they require reachable API/companion endpoints.
+
+## CI and infrastructure operations
+
+| Workflow | Purpose |
+|---|---|
+| [ci.yml](.github/workflows/ci.yml) | Java/Go checks, Docker builds, PowerShell parsing, manifest validation |
+| [reliability-demo.yml](.github/workflows/reliability-demo.yml) | Temporary PostgreSQL + Java reliability scenario and evidence artifact |
+| [runtime-validation.yml](.github/workflows/runtime-validation.yml) | Temporary kind deployment, replacement/persistence, Terraform, Ansible |
+| [hosted-monitoring.yml](.github/workflows/hosted-monitoring.yml) | Temporary Compose monitoring and Pages deployment |
+
+The [Jenkinsfile](Jenkinsfile) requires a configured Windows Jenkins agent with Java 21, Git, Docker, kubectl, a running PostgreSQL database on host port `15432`, and a username/password credential named `payguard-db-credentials`. GitHub Actions success does not establish Jenkins execution.
 
 ## Kubernetes
 
-PayGuard runs locally using Minikube.
+`start.ps1 -Kubernetes` starts Minikube but **does not deploy the manifests or load images**. Deploy both images and local secrets before using `run-demo.ps1 -Kubernetes`; consult the [operations runbook](docs/runbooks/OPERATIONS.md) and [architecture guide](docs/ARCHITECTURE.md). The kind workflow contains a complete automated deployment example. It creates an ephemeral database secret instead of using the example password.
 
-Start Minikube:
+## Terraform and Ansible
 
-```powershell
-minikube start
-```
-
-Verify the cluster:
-
-```powershell
-kubectl get nodes
-kubectl get pods -n payguard
-kubectl get pvc -n payguard
-```
-
-The payment service has startup, readiness, and liveness probes.
-
-PostgreSQL uses `pg_isready` for readiness and liveness checks.
-
-### Kubernetes Reliability Tests
-
-The environment has been manually tested for:
-
-- Pod deletion and automatic recreation
-- Payment persistence after application pod replacement
-- PostgreSQL PVC persistence
-- Scaling from one to two payment-service replicas
-- Rolling Deployment updates
-- Deployment rollback
-- Scaling back to one replica
-
-Example scaling:
-
-```powershell
-kubectl scale deployment payment-service -n payguard --replicas=2
-kubectl rollout status deployment/payment-service -n payguard
-```
-
-Rollback:
-
-```powershell
-kubectl rollout undo deployment/payment-service -n payguard
-```
-
-## Persistent Storage
-
-PostgreSQL uses the `postgres-data` PersistentVolumeClaim.
-
-Verified configuration:
-
-```text
-Capacity: 1Gi
-Access Mode: RWO
-Storage Class: standard
-```
-
-Durability was tested by retrieving an existing payment successfully after replacing the application pod.
-
-## Optional online Grafana dashboard
-
-To host the **real Grafana panels** for public viewing, follow [Grafana Cloud setup](docs/GRAFANA-CLOUD.md). The free Cloud stack receives selected metrics through Prometheus `remote_write` when PayGuard is running locally. Import `observability/grafana/payguard-cloud-dashboard.json`, then share the Grafana dashboard externally. This needs your Grafana Cloud account, metrics instance ID, and a private `metrics:write` token; no credentials belong in this repository. GitHub Pages itself cannot host Prometheus or Grafana servers.
-
-## Observability
-
-PayGuard includes a complete local metrics and logging stack.
-
-### Metrics
-
-```text
-Spring Boot
-    |
-    v
-Micrometer
-    |
-    v
-Prometheus
-    |
-    v
-Grafana
-```
-
-### Logs
-
-```text
-Container Logs
-     |
-     v
-Grafana Alloy
-     |
-     v
-Loki
-     |
-     v
-Grafana
-```
-
-Provisioned dashboards include:
-
-```text
-payguard-overview.json
-payguard-logs.json
-```
-
-## SLI and SLO Monitoring
-
-Prometheus recording rules include:
-
-```text
-payguard:sli_payment_requests:rate5m
-payguard:sli_payment_errors:rate5m
-payguard:sli_availability:ratio5m
-payguard:sli_error:ratio5m
-payguard:slo_availability:burn_rate5m
-payguard:sli_latency_250ms:ratio5m
-```
-
-Alerts include:
-
-```text
-PayGuardAvailabilityBurnRateWarning
-PayGuardAvailabilityBurnRateCritical
-PayGuardLatencySLOViolation
-```
-
-See `docs/SRE.md` for the SRE design.
-
-## Testing
-
-Run the Java test suite:
-
-```powershell
-cd payment-service
-.\mvnw.cmd clean test
-```
-
-Test classes include:
-
-```text
-PaymentServiceApplicationTests
-PaymentServiceIntegrationTest
-```
-
-## GitHub Actions
-
-The repository contains:
-
-```text
-.github/workflows/ci.yml
-```
-
-The CI workflow performs:
-
-```text
-Checkout
-   |
-   v
-Java 21 Setup
-   |
-   v
-Maven Tests
-   |
-   +-----------> Docker Build
-   |
-   +-----------> Kubernetes Manifest Validation
-```
-
-## Jenkins
-
-The repository also contains a `Jenkinsfile`.
-
-Pipeline stages:
-
-```text
-Checkout
-   |
-   v
-Test
-   |
-   v
-Package
-   |
-   v
-Docker Build
-   |
-   v
-Kubernetes Validation
-   |
-   v
-JUnit + Artifact Archival
-```
-
-See `docs/CI-CD.md`.
-
-## Terraform
-
-Terraform uses the HashiCorp Kubernetes provider.
-
-Terraform intentionally manages an isolated namespace:
-
-```text
-payguard-iac
-```
-
-This prevents the IaC demonstration from taking ownership of the manually deployed `payguard` environment.
-
-Verified Terraform workflow:
-
-```powershell
-terraform init
-terraform validate
-terraform plan
-terraform apply
-terraform plan
-```
-
-After applying the configuration, the final plan returned:
-
-```text
-No changes. Your infrastructure matches the configuration.
-```
-
-Terraform state and the `.terraform` directory are excluded from Git.
-
-The Terraform provider lock file is retained for reproducible provider selection.
-
-## Ansible
-
-The repository contains:
-
-```text
-ansible/
-├── ansible.cfg
-├── inventory.ini
-└── playbooks/
-    └── verify-payguard.yml
-```
-
-The playbook is designed to verify:
-
-- kubectl availability
-- Minikube status
-- PayGuard namespace
-- payment-service rollout
-- PostgreSQL rollout
-- PostgreSQL PVC
-- Application pods
-
-The playbook is intended to execute from a Linux/WSL Ansible control environment.
-
-Ansible operational verification has been runtime-tested successfully from the configured control environment. See `docs/CI-CD.md` for the scope of that check.
+Terraform commands run from `terraform/` with a reachable cluster/kubeconfig. The default context is `minikube`; CI overrides it to `kind-payguard-test`. The Ansible playbook runs from `ansible/` on Linux/WSL with access to the relevant kubeconfig. Their verified scope is namespace/configuration management and operational verification, respectively.
 
 ## Secrets and Repository Safety
 
-Local Compose ports bind to `127.0.0.1`; they are unavailable to other machines on the network. Grafana admin credentials belong in `.env` (`GRAFANA_ADMIN_PASSWORD`), which is ignored by Git. On an existing Grafana volume, changing the environment variable does not reset the existing admin account. To rotate an existing Grafana password after `start.ps1`, run:
+Compose host ports bind to `127.0.0.1`. Keep `.env`, real Kubernetes secrets, tokens, private keys, kubeconfig, and Terraform state out of Git. `kubernetes/secret.example.yaml` is an example; `kubernetes/secret.yaml` is ignored. These are useful safeguards, not evidence of a full security audit.
+
+An existing Grafana volume may retain its old password even after `.env` changes. To rotate the admin password after starting:
 
 ```powershell
-$grafanaPassword = (Get-Content .env | Where-Object { $_ -match "^GRAFANA_ADMIN_PASSWORD=" } | Select-Object -Last 1) -replace "^GRAFANA_ADMIN_PASSWORD=", ""
+$grafanaPassword = (Get-Content .env | Where-Object { $_ -match '^GRAFANA_ADMIN_PASSWORD=' } | Select-Object -Last 1) -replace '^GRAFANA_ADMIN_PASSWORD=', ''
 docker compose exec -T grafana grafana cli admin reset-admin-password $grafanaPassword
 Remove-Variable grafanaPassword
 ```
 
-The local Kubernetes Secret is excluded from Git:
+Remaining limits: Jenkins runtime execution, the exact local Minikube configuration, dedicated vulnerability/secret-scanning pipelines, and load/resource-budget testing. Kubernetes manifests specify resource requests/limits; Compose does not yet enforce a memory budget. Several observability images use `latest`, so future pulls may change their versions. Prometheus alert rules are present; external alert delivery is not established by the tests.
 
-```text
-kubernetes/secret.yaml
-```
+## Repository and documentation
 
-The repository contains the example configuration:
+| Directory/file | Contents |
+|---|---|
+| `payment-service/` | Java API, migrations, integration tests, Dockerfile |
+| `sidecar/` | Go health observer, behavior tests, Dockerfile |
+| `scripts/` | Windows operations and Python/JavaScript hosted automation |
+| `kubernetes/` | API/companion, PostgreSQL, PVC, config and secret example |
+| `observability/` | Prometheus/rules, Grafana provisioning/dashboards, Loki/Alloy |
+| `terraform/`, `ansible/` | Infrastructure representation and operational verification |
+| `.github/workflows/`, `Jenkinsfile` | CI and runtime validation |
+| `website/` | Static portfolio and interactive replay |
+| `docs/` | Detailed guides, runbooks and verification scope |
 
-```text
-kubernetes/secret.example.yaml
-```
+- [Windows start/stop and credential recovery](docs/WINDOWS-OPERATIONS.md)
+- [Validation evidence](docs/VALIDATION.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [SRE design](docs/SRE.md)
+- [CI/CD guide](docs/CI-CD.md)
+- [Operations runbook](docs/runbooks/OPERATIONS.md)
+- [Optional Grafana Cloud](docs/GRAFANA-CLOUD.md)
 
-The following should never be committed:
-
-- Real passwords
-- API tokens
-- `.env` files
-- Terraform state
-- Kubernetes kubeconfig files
-- Private credentials
-
-## Repository Structure
-
-```text
-PayGuard/
-├── .github/
-│   └── workflows/
-│       └── ci.yml
-├── ansible/
-│   └── playbooks/
-├── docs/
-│   └── runbooks/
-├── kubernetes/
-│   ├── payment-service/
-│   └── postgres/
-├── observability/
-│   ├── alloy/
-│   ├── grafana/
-│   ├── loki/
-│   └── prometheus/
-├── payment-service/
-├── terraform/
-├── docker-compose.yml
-├── Jenkinsfile
-└── README.md
-```
-
-## Engineering Questions Demonstrated
-
-PayGuard is designed to demonstrate practical engineering questions:
-
-- How do we prevent duplicate payment processing?
-- What happens when a payment provider fails?
-- How are uncertain payments reconciled?
-- What happens when an application pod dies?
-- Does payment data survive pod replacement?
-- Can the application scale horizontally?
-- Can Kubernetes perform a rolling deployment?
-- Can a failed deployment be rolled back?
-- How are availability and latency measured?
-- How are logs centralized?
-- How can infrastructure be represented as code?
-- How can operational verification be automated?
-
-## Documentation
-
-Detailed documentation is available in:
-
-- `docs/ARCHITECTURE.md`
-- `docs/SRE.md`
-- `docs/CI-CD.md`
-- `docs/runbooks/OPERATIONS.md`
-
-## Current Status
-
-### Verified Locally
-
-- Spring Boot payment service
-- PostgreSQL integration
-- Flyway migrations
-- Payment persistence
-- Idempotency implementation
-- Failure simulation
-- Reconciliation functionality
-- Automated Java tests
-- Docker image
-- Docker Compose environment
-- Prometheus
-- Grafana
-- Loki
-- Grafana Alloy
-- Kubernetes deployment
-- Health probes
-- Kubernetes self-healing
-- PVC persistence
-- Replica scaling
-- Rolling update
-- Rollback
-- Terraform provisioning
-- Terraform idempotency
-- Ansible operational verification runtime
-
-### Defined but Pending Runtime Validation
-
-- GitHub Actions reliability demo and Pages deployment, successfully executed on commit `105a1fa`
-- Jenkins execution on an actual Jenkins agent
-
-## Purpose
-
-PayGuard is a portfolio project focused on demonstrating how backend development, DevOps, observability, Infrastructure as Code, and SRE practices work together around a realistic payment-reliability problem.
+PayGuard is intended to demonstrate tested engineering decisions around payment uncertainty, persistence, monitoring, deployment, and recovery. The simulated provider and temporary runner evidence define the scope of those claims.
