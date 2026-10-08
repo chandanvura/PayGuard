@@ -111,7 +111,7 @@ See `docs/ARCHITECTURE.md` for the detailed architecture.
 
 `scripts/ci-demo.py` checks real payment, timeout, idempotency and reconciliation behavior. `scripts/export-monitoring.py` exports dated monitoring evidence. `scripts/check-sidecar.py` verifies the running Go companion in the hosted Compose workflow. Hosted monitoring still runs temporarily on GitHub Actions and publishes a dated capture; the public site is not a permanent API or monitoring server.
 
-The hosted workflow builds both images and exercises the companion. CI builds and checks its Go code. Kubernetes manifests include the companion, but this change has only schema validation there; a live Minikube rollout is a separate runtime check.
+The hosted workflow builds both images and exercises the companion. CI runs Go behavior tests with race detection. The infrastructure runtime workflow deploys the real manifests to a temporary kind cluster, verifies payment recovery and both containers, replaces the API pod, and checks persisted payment data. It also runs Terraform apply/no-change plan and Ansible verification. See [validation evidence and remaining limits](docs/VALIDATION.md). The exact local Minikube setup remains a separate check.
 
 ## Payment Reliability
 

@@ -695,7 +695,7 @@ PayGuard demonstrates several production-oriented design principles:
 
 ## 23. Verified Architecture Status
 
-The Go code checks, image build, and Kubernetes manifest validation passed in GitHub Actions. The hosted Compose sidecar check and site deployment require a successful hosted monitoring run. A live Minikube rollout of the added companion has not been verified.
+Go behavior tests with race detection, image builds, hosted Compose checks, and live Kubernetes tests passed. The Kubernetes tests used a temporary kind cluster and verified both containers, payment recovery, and persistence across API pod replacement. Terraform apply/no-change plan and Ansible operational checks also passed against that cluster. The exact local Minikube setup and Windows Jenkins execution remain separate checks. See [validation evidence](VALIDATION.md).
 
 Verified locally:
 
